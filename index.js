@@ -1,0 +1,75 @@
+const puppeteer = require('puppeteer');
+const fs = require('fs');
+const args = process.argv.slice(2); // Keep only parameters args
+
+const RETURN_CODES = {
+  eligible: 0,
+  badUsage: 1,
+  notEligible: 2,
+};
+
+const usage = () => {
+  console.log('npm start <address> [d:debug mode]');
+  process.exit(RETURN_CODES.badUsage);
+};
+
+const address = args[0];
+const debug = args[1] === 'd' || false ;
+
+address !== undefined || usage();
+
+// Various selectors definition
+const addressFieldSel = '#TBX_SaisieAdresseAutocompletion';
+const autoCompleteMenuSel = 'ul.ui-autocomplete';
+const autoCompleteResultSel = `${autoCompleteMenuSel + ' li.ui-menu-item a.ui-corner-all:not(.o-link-arrow):first-child'}`
+const testButtonSel = '#ctl00_ContentPlaceHolder1_TestAdresse_HL_Valide_AdresseAutoCompletion';
+const resultSel = '#eligibility-result';
+const eligibleSel = '[data-name="Eligible-Fibre"]';
+const remainingStepDisplaySel = '#Titre_Chevron';
+const currentStepSel = '.timeline-description .encours';
+
+(async () => {
+  const browser = await puppeteer.launch({headless: !debug});
+  const page = await browser.newPage();
+
+  if (debug) {
+    page.on('console', (...args) => {
+      for (let i = 0; i < args.length; ++i)
+        console.log(`[Remote console] ${i}: ${args[i]}`);
+    });
+  }
+
+  await page.setViewport({width: 1024, height: 768});
+  await page.goto('https://boutique.orange.fr/eligibilite', {waitUntil: 'networkidle'});
+
+  // Enter the address
+  await page.focus(addressFieldSel);
+  await page.type(address, {delay: 100}); // Types slower, like a user
+  // Select from autocomplete menu
+  await page.waitForSelector(autoCompleteMenuSel, {visible: true});
+  await page.click(autoCompleteResultSel, {visible: true});
+  // Launch check by clicking on the Test button
+  await page.click(testButtonSel);
+  await page.waitForSelector(resultSel, {visible: true});
+
+  // Result analysis
+  let returnCode;
+  const isEligible = await page.evaluate((eligibleSel) => {
+    return document.querySelector(eligibleSel) !== null;
+  }, eligibleSel);
+
+  if (!isEligible) {
+    returnCode = RETURN_CODES.notEligible;
+    await page.click(remainingStepDisplaySel);
+    console.log(await page.evaluate((currentStepSel) => {
+      // Remove multiple line-break
+      return document.querySelector(currentStepSel).innerText.trim().replace(/[\r\n]/g, '\n');
+    }, currentStepSel));
+  } else {
+    returnCode = RETURN_CODES.eligible;
+    console.log('Eligible !');
+  }
+  await page.screenshot({path: 'output/result.png', fullPage: true});
+  browser.close();
+  process.exit(returnCode);
+})();
