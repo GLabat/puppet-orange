@@ -1,5 +1,8 @@
 const puppeteer = require('puppeteer');
-const fs = require('fs');
+const path = require('path');
+const fs = require('await-fs');
+var crypto = require('crypto');
+
 const args = process.argv.slice(2); // Keep only parameters args
 
 const RETURN_CODES = {
@@ -8,6 +11,7 @@ const RETURN_CODES = {
   notEligible: 2,
 };
 
+const OUTPUT_DIR = path.join(__dirname, 'output');
 const usage = () => {
   console.log('npm start <address> [d:debug mode]');
   process.exit(RETURN_CODES.badUsage);
@@ -28,15 +32,26 @@ const eligibleSel = '[data-name="Eligible-Fibre"]';
 const remainingStepDisplaySel = '#Titre_Chevron';
 const currentStepSel = '.timeline-description .encours';
 
+const addressHash = crypto.createHash('md5').update(address).digest('hex');
+
+// Main
 (async () => {
   const browser = await puppeteer.launch({headless: !debug});
   const page = await browser.newPage();
-
+  const runOutputDir = path.join(OUTPUT_DIR, addressHash);
+  console.log(`Output directory: ${runOutputDir}`);
   if (debug) {
     page.on('console', (...args) => {
       for (let i = 0; i < args.length; ++i)
         console.log(`[Remote console] ${i}: ${args[i]}`);
     });
+  }
+
+  // Create output directory
+  try {
+    await fs.stat(runOutputDir);
+  } catch(e) {
+    await fs.mkdir(runOutputDir);
   }
 
   await page.setViewport({width: 1024, height: 768});
@@ -69,7 +84,8 @@ const currentStepSel = '.timeline-description .encours';
     returnCode = RETURN_CODES.eligible;
     console.log('Eligible !');
   }
-  await page.screenshot({path: 'output/result.png', fullPage: true});
+
+  await page.screenshot({path: path.join(runOutputDir, 'result.png'), fullPage: true});
   browser.close();
   process.exit(returnCode);
 })();
