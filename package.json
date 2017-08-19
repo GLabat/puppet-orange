@@ -1,0 +1,18 @@
+{
+  "name": "puppet-orange",
+  "version": "1.0.0",
+  "description": "Test eligibility to Orange ISP fiber offer",
+  "main": "index.js",
+  "dependencies": {
+    "puppeteer": "^0.9.0"
+  },
+  "devDependencies": {
+    "eslint": "^4.5.0"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js"
+  },
+  "author": "LABAT Guillaume",
+  "license": "ISC"
+}
