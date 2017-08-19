@@ -1,7 +1,8 @@
 # puppet-orange
 
-`puppet-orange` is a nodeJS Puppeteer script. Its purpose is to check for the eligibility of a postal address to the Orange fiber offer.
+`puppet-orange` is a NodeJS Puppeteer script. Its purpose is to check for the eligibility of a postal address to the Orange fiber offer.
 Given an address, the script validates the status of this address on the Orange eligibility website.
+> Minimal NodeJs version: 8 (use of `util.promisify`).
 
 # Install & run
 

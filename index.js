@@ -1,21 +1,46 @@
 const puppeteer = require('puppeteer');
 const path = require('path');
-const fs = require('await-fs');
 var crypto = require('crypto');
+const { promisify } = require('util');
+const fs = require('fs');
+const accessAsync = promisify(fs.access);
+const mkdirAsync = promisify(fs.mkdir);
 
 const args = process.argv.slice(2); // Keep only parameters args
 
-const RETURN_CODES = {
-  eligible: 0,
-  badUsage: 1,
-  notEligible: 2,
+const BAD_USAGE = 99;
+const ELIGIBLE = 0;
+const NOT_YET_ELIGIBLE = 1;
+const NOT_ELIGIBLE = 2;
+
+const ELIGIBILITY_STATES = [
+  { code: ELIGIBLE, selector: '[data-name="Eligible-Fibre"]', },
+  { code: NOT_YET_ELIGIBLE, selector: '#DIV_Etapes_Reponse', },
+  { code: NOT_ELIGIBLE, selector: '[data-name="NonEligible-Fibre"]' },
+];
+
+// Main output directory
+const OUTPUT_DIR = path.join(__dirname, 'output');
+
+/**
+ * Display the CLI options
+ */
+const usage = () => {
+  console.log('npm start <address> [d:debug mode] [-s: silent nodejs]');
+  process.exit(BAD_USAGE);
 };
 
-const OUTPUT_DIR = path.join(__dirname, 'output');
-const usage = () => {
-  console.log('npm start <address> [d:debug mode]');
-  process.exit(RETURN_CODES.badUsage);
+/**
+ * Print debug information
+ * @param {*} args 
+ */
+const debugLog = (...args) => {
+  if (debug) {
+    console.log(args);
+  }
 };
+
+//================================================
 
 const address = args[0];
 const debug = args[1] === 'd' || false ;
@@ -28,18 +53,34 @@ const autoCompleteMenuSel = 'ul.ui-autocomplete';
 const autoCompleteResultSel = `${autoCompleteMenuSel + ' li.ui-menu-item a.ui-corner-all:not(.o-link-arrow):first-child'}`
 const testButtonSel = '#ctl00_ContentPlaceHolder1_TestAdresse_HL_Valide_AdresseAutoCompletion';
 const resultSel = '#eligibility-result';
-const eligibleSel = '[data-name="Eligible-Fibre"]';
 const remainingStepDisplaySel = '#Titre_Chevron';
 const currentStepSel = '.timeline-description .encours';
 
 const addressHash = crypto.createHash('md5').update(address).digest('hex');
 
-// Main
+//=============== MAIN ===========================
 (async () => {
   const browser = await puppeteer.launch({headless: !debug});
   const page = await browser.newPage();
   const runOutputDir = path.join(OUTPUT_DIR, addressHash);
-  console.log(`Output directory: ${runOutputDir}`);
+  debugLog(`Output directory: ${runOutputDir}`);
+  
+  // Make sure main output directory exists
+  try {
+    await accessAsync(OUTPUT_DIR);
+  } catch(e) {
+    debugLog(`Creating main output directory: ${OUTPUT_DIR}`);
+    await mkdirAsync(OUTPUT_DIR);
+  }
+  
+  // Make sure output directory exists
+  try {
+    await accessAsync(runOutputDir);
+  } catch(e) {
+    debugLog(`Creating output directory: ${runOutputDir}`);
+    await mkdirAsync(runOutputDir);
+  }
+
   if (debug) {
     page.on('console', (...args) => {
       for (let i = 0; i < args.length; ++i)
@@ -47,15 +88,9 @@ const addressHash = crypto.createHash('md5').update(address).digest('hex');
     });
   }
 
-  // Create output directory
-  try {
-    await fs.stat(runOutputDir);
-  } catch(e) {
-    await fs.mkdir(runOutputDir);
-  }
-
   await page.setViewport({width: 1024, height: 768});
-  await page.goto('https://boutique.orange.fr/eligibilite', {waitUntil: 'networkidle'});
+  console.log('Checking…');
+  await page.goto('https://boutique.orange.fr/eligibilite', {waitUntil: 'networkidle', networkIdleTimeout: 3000});
 
   // Enter the address
   await page.focus(addressFieldSel);
@@ -68,21 +103,35 @@ const addressHash = crypto.createHash('md5').update(address).digest('hex');
   await page.waitForSelector(resultSel, {visible: true});
 
   // Result analysis
-  let returnCode;
-  const isEligible = await page.evaluate((eligibleSel) => {
-    return document.querySelector(eligibleSel) !== null;
-  }, eligibleSel);
+  const returnCode = await page.evaluate((eligibilityStates) => {
+    // Iterate over states and check if available
+    let stateCode;
+    eligibilityStates.some((state) => {
+      if (document.querySelector(state.selector) !== null) {
+        stateCode = state.code;
+      }
+    });
+    return stateCode;
+  }, ELIGIBILITY_STATES);
 
-  if (!isEligible) {
-    returnCode = RETURN_CODES.notEligible;
-    await page.click(remainingStepDisplaySel);
-    console.log(await page.evaluate((currentStepSel) => {
-      // Remove multiple line-break
-      return document.querySelector(currentStepSel).innerText.trim().replace(/[\r\n]/g, '\n');
-    }, currentStepSel));
-  } else {
-    returnCode = RETURN_CODES.eligible;
-    console.log('Eligible !');
+  switch(returnCode) {
+    case ELIGIBLE:
+      console.log('### Eligible! ###');
+      break;
+      case NOT_ELIGIBLE:
+      console.log('### Not eligible :-( ###');
+      break;
+      case NOT_YET_ELIGIBLE:
+      console.log('### Not yet eligible! ###');
+      await page.click(remainingStepDisplaySel);
+      console.log(`### Progress: \n${await page.evaluate((currentStepSel) => {
+        // Remove multiple line-breaks
+        return document.querySelector(currentStepSel).innerText.replace(/^\s+|\s+$/g, '').replace(/[\r\n]/g, '\n');
+      }, currentStepSel)}`);
+      break;
+    default:
+      returnCode = BAD_USAGE;
+      break;
   }
 
   await page.screenshot({path: path.join(runOutputDir, 'result.png'), fullPage: true});

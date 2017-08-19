@@ -4,7 +4,6 @@
   "description": "Test eligibility to Orange ISP fiber offer",
   "main": "index.js",
   "dependencies": {
-    "await-fs": "^1.0.0",
     "puppeteer": "^0.9.0"
   },
   "devDependencies": {
@@ -16,8 +15,8 @@
   },
   "author": "LABAT Guillaume",
   "repository": {
-    "type" : "git",
-    "url" : "git@github.com:GLabat/puppet-orange.git"
+    "type": "git",
+    "url": "git@github.com:GLabat/puppet-orange.git"
   },
   "license": "ISC"
 }
