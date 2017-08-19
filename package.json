@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Test eligibility to Orange ISP fiber offer",
   "main": "index.js",
+  "engines": {
+    "node": ">=8"
+  },
   "dependencies": {
     "puppeteer": "^0.9.0"
   },
