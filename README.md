@@ -19,3 +19,4 @@ You can pass the character 'd' as second argument of the `start` script. This wo
 
 * run Chrome in non-headless mode
 * add capture of remote browser console
+* add debug logs
