@@ -15,5 +15,9 @@
     "start": "node index.js"
   },
   "author": "LABAT Guillaume",
+  "repository": {
+    "type" : "git",
+    "url" : "git@github.com:GLabat/puppet-orange.git"
+  },
   "license": "ISC"
 }
