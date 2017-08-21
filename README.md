@@ -4,16 +4,25 @@
 Given an address, the script validates the status of this address on the Orange eligibility website.
 > Minimal NodeJs version: 8 (use of `util.promisify`).
 
-# Install & run
+## Install & run
 
 ```shell
 git clone git@github.com:GLabat/puppet-orange.git
 cd puppet-orange
 npm i
-npm start <address>
+npm start '<address>'
 ```
 
-# Debug
+## Return code
+
+The script will return the following codes:
+
+* Bad usage: `99`
+* Eligible: `0`
+* Not yet eligible: `1`
+* Not eligible: `2`
+
+## Debug
 
 You can pass the character 'd' as second argument of the `start` script. This would activate the debug mode:
 
