@@ -13,6 +13,8 @@ npm i
 npm start '<address>'
 ```
 
+> To run in Docker, `docker run -it -v "$(pwd)":/app glabat:puppet-orange npm start '<address>'`
+
 ## Return code
 
 The script will return the following codes:
@@ -29,3 +31,7 @@ You can pass the character 'd' as second argument of the `start` script. This wo
 * run Chrome in non-headless mode
 * add capture of remote browser console
 * add debug logs
+
+## Build the Docker image
+
+`docker build . -t glabat:puppet-orange`
