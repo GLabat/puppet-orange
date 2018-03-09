@@ -1,8 +1,11 @@
 const puppeteer = require('puppeteer')
 const path = require('path')
-var crypto = require('crypto')
+const crypto = require('crypto')
 const { promisify } = require('util')
 const fs = require('fs')
+const chalk = require('chalk')
+
+// ## To remove?
 const accessAsync = promisify(fs.access)
 const mkdirAsync = promisify(fs.mkdir)
 
@@ -50,8 +53,28 @@ const ELIGIBILITY_STATES = [
  */
 const debugLog = (...args) => {
   if (debug) {
-    console.log(args)
+    console.log(chalk.cyan(`[Debug] ${args}`))
   }
+}
+
+const infoLog = (...args) => {
+  console.log(chalk.green(`[Info] ${args}`))
+}
+
+const warnLog = (...args) => {
+  console.log(chalk.yellow(`[Warn] ${args}`))
+}
+
+const errLog = (...args) => {
+  console.log(chalk.red(`[Error] ${args}`))
+}
+
+const descLog = (...args) => {
+  console.log(chalk.magenta(args))
+}
+
+const neutralLog = (...args) => {
+  console.log(chalk.white(args))
 }
 
 //================================================
@@ -101,12 +124,12 @@ puppeteer
     if (debug) {
       page.on('console', (...args) => {
         for (let i = 0; i < args.length; ++i)
-          console.log(`[Remote console] ${i}: ${args[i]}`)
+          neutralLog(`[Remote console] ${i}: ${args[i]}`)
       })
     }
 
     await page.setViewport({ width: 1024, height: 768 })
-    console.log('Checking…')
+    infoLog('Checking…')
     await page.goto('https://boutique.orange.fr/eligibilite')
 
     // Enter the address
@@ -133,15 +156,15 @@ puppeteer
 
     switch (returnCode) {
       case ELIGIBLE:
-        console.log('### Eligible! ###')
+        warnLog('### Eligible! ###')
         break
       case NOT_ELIGIBLE:
-        console.log('### Not eligible :-( ###')
+        warnLog('### Not eligible :-( ###')
         break
       case NOT_YET_ELIGIBLE:
-        console.log('### Not yet eligible! ###')
+        warnLog('### Not yet eligible! ###')
         await page.click(remainingStepDisplaySel)
-        console.log(
+        descLog(
           `### Progress: \n${await page.evaluate(currentStepSel => {
             // Remove multiple line-breaks
             return document
@@ -167,6 +190,6 @@ puppeteer
     process.exit(returnCode)
   })
   .catch(e => {
-    console.error(e.message)
+    errLog(e.message)
     process.exit(UNKNOWN_ERR)
   })
