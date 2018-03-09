@@ -75,98 +75,98 @@ const addressHash = crypto
   .digest('hex')
 
 //=============== MAIN ===========================
-;(async () => {
-  const browser = await puppeteer.launch({
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
-  })
-  const page = await browser.newPage()
-  const runOutputDir = path.join(OUTPUT_DIR, addressHash)
-  debugLog(`Output directory: ${runOutputDir}`)
+puppeteer
+  .launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] })
+  .then(async browser => {
+    const page = await browser.newPage()
+    const runOutputDir = path.join(OUTPUT_DIR, addressHash)
+    debugLog(`Output directory: ${runOutputDir}`)
 
-  // Make sure main output directory exists
-  try {
-    await accessAsync(OUTPUT_DIR)
-  } catch (e) {
-    debugLog(`Creating main output directory: ${OUTPUT_DIR}`)
-    await mkdirAsync(OUTPUT_DIR)
-  }
+    // Make sure main output directory exists
+    try {
+      await accessAsync(OUTPUT_DIR)
+    } catch (e) {
+      debugLog(`Creating main output directory: ${OUTPUT_DIR}`)
+      await mkdirAsync(OUTPUT_DIR)
+    }
 
-  // Make sure output directory exists
-  try {
-    await accessAsync(runOutputDir)
-  } catch (e) {
-    debugLog(`Creating output directory: ${runOutputDir}`)
-    await mkdirAsync(runOutputDir)
-  }
+    // Make sure output directory exists
+    try {
+      await accessAsync(runOutputDir)
+    } catch (e) {
+      debugLog(`Creating output directory: ${runOutputDir}`)
+      await mkdirAsync(runOutputDir)
+    }
 
-  if (debug) {
-    page.on('console', (...args) => {
-      for (let i = 0; i < args.length; ++i)
-        console.log(`[Remote console] ${i}: ${args[i]}`)
+    if (debug) {
+      page.on('console', (...args) => {
+        for (let i = 0; i < args.length; ++i)
+          console.log(`[Remote console] ${i}: ${args[i]}`)
+      })
+    }
+
+    await page.setViewport({ width: 1024, height: 768 })
+    console.log('Checking…')
+    await page.goto('https://boutique.orange.fr/eligibilite')
+
+    // Enter the address
+    await page.focus(addressFieldSel)
+    await page.type(addressFieldSel, address, { delay: 100 }) // Types slowly, like a user
+    // Select from autocomplete menu
+    await page.waitForSelector(autoCompleteMenuSel, { visible: true })
+    await page.click(autoCompleteResultSel, { visible: true })
+    // Launch check by clicking on the Test button
+    await page.click(testButtonSel)
+    await page.waitForSelector(resultSel, { visible: true })
+
+    // Result analysis
+    const returnCode = await page.evaluate(eligibilityStates => {
+      // Iterate over states and check if available
+      let stateCode
+      eligibilityStates.some(state => {
+        if (document.querySelector(state.selector) !== null) {
+          stateCode = state.code
+        }
+      })
+      return stateCode
+    }, ELIGIBILITY_STATES)
+
+    switch (returnCode) {
+      case ELIGIBLE:
+        console.log('### Eligible! ###')
+        break
+      case NOT_ELIGIBLE:
+        console.log('### Not eligible :-( ###')
+        break
+      case NOT_YET_ELIGIBLE:
+        console.log('### Not yet eligible! ###')
+        await page.click(remainingStepDisplaySel)
+        console.log(
+          `### Progress: \n${await page.evaluate(currentStepSel => {
+            // Remove multiple line-breaks
+            return document
+              .querySelector(currentStepSel)
+              .innerText.replace(/^\s+|\s+$/g, '')
+              .replace(/[\r\n]/g, '\n')
+          }, currentStepSel)}`
+        )
+        await page.click(showMapSel)
+        await page.waitForSelector('#map.js-show')
+        await page.screenshot({ path: 'map.png' })
+        break
+      default:
+        returnCode = BAD_USAGE
+        break
+    }
+
+    await page.screenshot({
+      path: path.join(runOutputDir, 'result.png'),
+      fullPage: true
     })
-  }
-
-  await page.setViewport({ width: 1024, height: 768 })
-  console.log('Checking…')
-  await page.goto('https://boutique.orange.fr/eligibilite', {
-    waitUntil: 'networkidle',
-    networkIdleTimeout: 3000
+    browser.close()
+    process.exit(returnCode)
   })
-
-  // Enter the address
-  await page.focus(addressFieldSel)
-  await page.type(address, { delay: 100 }) // Types slower, like a user
-  // Select from autocomplete menu
-  await page.waitForSelector(autoCompleteMenuSel, { visible: true })
-  await page.click(autoCompleteResultSel, { visible: true })
-  // Launch check by clicking on the Test button
-  await page.click(testButtonSel)
-  await page.waitForSelector(resultSel, { visible: true })
-
-  // Result analysis
-  const returnCode = await page.evaluate(eligibilityStates => {
-    // Iterate over states and check if available
-    let stateCode
-    eligibilityStates.some(state => {
-      if (document.querySelector(state.selector) !== null) {
-        stateCode = state.code
-      }
-    })
-    return stateCode
-  }, ELIGIBILITY_STATES)
-
-  switch (returnCode) {
-    case ELIGIBLE:
-      console.log('### Eligible! ###')
-      break
-    case NOT_ELIGIBLE:
-      console.log('### Not eligible :-( ###')
-      break
-    case NOT_YET_ELIGIBLE:
-      console.log('### Not yet eligible! ###')
-      await page.click(remainingStepDisplaySel)
-      console.log(
-        `### Progress: \n${await page.evaluate(currentStepSel => {
-          // Remove multiple line-breaks
-          return document
-            .querySelector(currentStepSel)
-            .innerText.replace(/^\s+|\s+$/g, '')
-            .replace(/[\r\n]/g, '\n')
-        }, currentStepSel)}`
-      )
-      await page.click(showMapSel)
-      await page.waitForSelector('#map.js-show')
-      await page.screenshot({ path: 'map.png' })
-      break
-    default:
-      returnCode = BAD_USAGE
-      break
-  }
-
-  await page.screenshot({
-    path: path.join(runOutputDir, 'result.png'),
-    fullPage: true
+  .catch(e => {
+    console.error(e.message)
+    process.exit(99)
   })
-  browser.close()
-  process.exit(returnCode)
-})()
