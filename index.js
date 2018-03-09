@@ -120,7 +120,7 @@ puppeteer
     await page.waitForSelector(resultSel, { visible: true })
 
     // Result analysis
-    const returnCode = await page.evaluate(eligibilityStates => {
+    let returnCode = await page.evaluate(eligibilityStates => {
       // Iterate over states and check if available
       let stateCode
       eligibilityStates.some(state => {
