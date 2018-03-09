@@ -33,7 +33,7 @@ const address = args.address
 const debug = args.debug
 const OUTPUT_DIR = args.outputDir
 
-const BAD_USAGE = 99
+const UNKNOWN_ERR = 99
 const ELIGIBLE = 0
 const NOT_YET_ELIGIBLE = 1
 const NOT_ELIGIBLE = 2
@@ -155,7 +155,7 @@ puppeteer
         await page.screenshot({ path: 'map.png' })
         break
       default:
-        returnCode = BAD_USAGE
+        returnCode = UNKNOWN_ERR
         break
     }
 
@@ -168,5 +168,5 @@ puppeteer
   })
   .catch(e => {
     console.error(e.message)
-    process.exit(99)
+    process.exit(UNKNOWN_ERR)
   })
