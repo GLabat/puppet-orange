@@ -6,7 +6,32 @@ const fs = require('fs')
 const accessAsync = promisify(fs.access)
 const mkdirAsync = promisify(fs.mkdir)
 
-const args = process.argv.slice(2) // Keep only parameters args
+const args = require('yargs')
+  .usage('node $0 [options]')
+  .option('address', {
+    alias: 'a',
+    describe: 'the postal address to check eligibility for',
+    require: true,
+    type: 'string'
+  })
+  .option('debug', {
+    alias: 'd',
+    describe: 'debug mode with more logs',
+    type: 'boolean',
+    default: false
+  })
+  .option('outputDir', {
+    alias: 'o',
+    describe: 'path to directory to store script results',
+    type: 'string',
+    default: path.join(__dirname, 'output')
+  })
+  .help('h')
+  .alias('h', 'help').argv
+
+const address = args.address
+const debug = args.debug
+const OUTPUT_DIR = args.outputDir
 
 const BAD_USAGE = 99
 const ELIGIBLE = 0
@@ -19,17 +44,6 @@ const ELIGIBILITY_STATES = [
   { code: NOT_ELIGIBLE, selector: '[data-name="NonEligible-Fibre"]' }
 ]
 
-// Main output directory
-const OUTPUT_DIR = path.join(__dirname, 'output')
-
-/**
- * Display the CLI options
- */
-const usage = () => {
-  console.log('npm start <address> [d:debug mode] [-s: silent nodejs]')
-  process.exit(BAD_USAGE)
-}
-
 /**
  * Print debug information
  * @param {*} args
@@ -41,11 +55,6 @@ const debugLog = (...args) => {
 }
 
 //================================================
-
-const address = args[0]
-const debug = args[1] === 'd' || false
-
-address !== undefined || usage()
 
 // Various selectors definition
 const addressFieldSel = '#TBX_SaisieAdresseAutocompletion'
@@ -68,7 +77,6 @@ const addressHash = crypto
 //=============== MAIN ===========================
 ;(async () => {
   const browser = await puppeteer.launch({
-    headless: !debug,
     args: ['--no-sandbox', '--disable-setuid-sandbox']
   })
   const page = await browser.newPage()

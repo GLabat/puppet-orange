@@ -19,5 +19,8 @@
     "type": "git",
     "url": "git@github.com:GLabat/puppet-orange.git"
   },
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "yargs": "^11.0.0"
+  }
 }
