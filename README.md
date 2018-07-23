@@ -2,6 +2,7 @@
 
 `puppet-orange` is a NodeJS Puppeteer script. Its purpose is to check for the eligibility of a postal address to the Orange fiber offer.
 Given an address, the script validates the status of this address on the Orange eligibility website.
+
 > Minimal NodeJs version: 8 (use of `util.promisify`).
 
 ## Install & run
@@ -9,11 +10,20 @@ Given an address, the script validates the status of this address on the Orange 
 ```shell
 git clone git@github.com:GLabat/puppet-orange.git
 cd puppet-orange
-npm i
-npm start '<address>'
+yarn install
+yarn start '<address>'
 ```
 
-> To run in Docker, `docker run -it -v "$(pwd)":/app glabat:puppet-orange npm start '<address>'`
+### Run in Docker
+
+* Build the Docker image
+
+```sh
+docker build . -t puppet-orange
+```
+
+* Run
+* > To run in Docker, `docker run -it -v "$(pwd)":/app puppet-orange yarn start -a '<address>'`
 
 ## Return code
 
@@ -32,6 +42,11 @@ You can pass the character 'd' as second argument of the `start` script. This wo
 * add capture of remote browser console
 * add debug logs
 
-## Build the Docker image
+## TODO
 
-`docker build . -t glabat:puppet-orange`
+* [ ] Review Docker image. Should contain everything
+* [x] Add Prettier
+* [x] Add yargs
+* [x] Update packages
+* [x] Add color output
+* [ ] Capture localisation map on Orange website

@@ -1,5 +1,38 @@
-FROM node:latest
-RUN apt-get update
-RUN apt-get install -y libxcomposite1 libx11-xcb1 libxcursor1 libxdamage1 libxi6 libxtst6 libnss3 libcups2 libxss1 libxrandr2 libgconf-2-4 libasound2 libatk1.0-0 libgtk-3-common
+FROM node:9-slim
+
+# From: https://github.com/GoogleChrome/puppeteer/blob/v0.13.0/docs/troubleshooting.md#running-puppeteer-in-docker
+
+# Install latest chrome dev package.
+# Note: this installs the necessary libs to make the bundled version of Chromium that Pupppeteer
+# installs, work.
+RUN apt-get update && apt-get install -y wget --no-install-recommends \
+  && wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
+  && sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list' \
+  && apt-get update \
+  && apt-get install -y google-chrome-unstable \
+  --no-install-recommends \
+  && rm -rf /var/lib/apt/lists/* \
+  && apt-get purge --auto-remove -y curl \
+  && rm -rf /src/*.deb
+
+# Uncomment to skip the chromium download when installing puppeteer. If you do,
+# you'll need to launch puppeteer with:
+#     browser.launch({executablePath: 'google-chrome-unstable'})
+# ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD true
+
 VOLUME /app
+
+RUN yarn cache clean && yarn add puppeteer yargs
+
+# Add pptr user.
+RUN groupadd -r pptruser && useradd -r -g pptruser -G audio,video pptruser \
+  && mkdir -p /home/pptruser/Downloads \
+  && chown -R pptruser:pptruser /home/pptruser \
+  && chown -R pptruser:pptruser /node_modules
+
+# Run user as non privileged.
+USER pptruser
+
 WORKDIR /app
+
+CMD ["google-chrome-unstable"]

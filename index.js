@@ -32,8 +32,8 @@ const args = require('yargs')
   .help('h')
   .alias('h', 'help').argv
 
-const address = args.address
-const debug = args.debug
+const ADDRESS = args.address
+const DEBUG = args.debug
 const OUTPUT_DIR = args.outputDir
 
 const UNKNOWN_ERR = 99
@@ -52,7 +52,7 @@ const ELIGIBILITY_STATES = [
  * @param {*} args
  */
 const debugLog = (...args) => {
-  if (debug) {
+  if (DEBUG) {
     console.log(chalk.cyan(`[Debug] ${args}`))
   }
 }
@@ -73,10 +73,6 @@ const descLog = (...args) => {
   console.log(chalk.magenta(args))
 }
 
-const neutralLog = (...args) => {
-  console.log(chalk.white(args))
-}
-
 //================================================
 
 // Various selectors definition
@@ -90,20 +86,37 @@ const resultSel = '#eligibility-result'
 const remainingStepDisplaySel = '#Titre_Chevron'
 const currentStepSel = '.timeline-description .encours'
 
-const showMapSel = '#Edito_Etape2A_AS_Non_Requis_Time_Line_EnCours a'
+const showMapSel = '#Edito_Etape2B_AS_Non_Requis_Time_Line_EnCours a'
 
 const addressHash = crypto
   .createHash('md5')
-  .update(address)
+  .update(ADDRESS)
   .digest('hex')
 
 //=============== MAIN ===========================
 puppeteer
   .launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] })
   .then(async browser => {
-    const page = await browser.newPage()
     const runOutputDir = path.join(OUTPUT_DIR, addressHash)
     debugLog(`Output directory: ${runOutputDir}`)
+
+    const page = await browser.newPage()
+    await page.tracing.start({
+      path: path.join(runOutputDir, 'trace.json'),
+      screenshots: true
+    })
+
+    let mapReceived = false
+    page.on('response', response => {
+      const req = response.request()
+      if (req.url().match('MapServer')) {
+        debugLog(`## req.url(): `) // eslint-disable-line
+        debugLog(req.url()) // eslint-disable-line
+      }
+      if (/ftth_cache_V\d\/MapServer/.test(req.url()) && response.ok()) {
+        mapReceived = true
+      }
+    })
 
     // Make sure main output directory exists
     try {
@@ -121,10 +134,9 @@ puppeteer
       await mkdirAsync(runOutputDir)
     }
 
-    if (debug) {
-      page.on('console', (...args) => {
-        for (let i = 0; i < args.length; ++i)
-          neutralLog(`[Remote console] ${i}: ${args[i]}`)
+    if (DEBUG) {
+      page.on('console', msg => {
+        console.log(`[Remote console] ${msg.text}`)
       })
     }
 
@@ -134,7 +146,7 @@ puppeteer
 
     // Enter the address
     await page.focus(addressFieldSel)
-    await page.type(addressFieldSel, address, { delay: 100 }) // Types slowly, like a user
+    await page.type(addressFieldSel, ADDRESS, { delay: 100 }) // Types slowly, like a user
     // Select from autocomplete menu
     await page.waitForSelector(autoCompleteMenuSel, { visible: true })
     await page.click(autoCompleteResultSel, { visible: true })
@@ -156,7 +168,7 @@ puppeteer
 
     switch (returnCode) {
       case ELIGIBLE:
-        warnLog('### Eligible! ###')
+        infoLog('### Eligible! ###')
         break
       case NOT_ELIGIBLE:
         warnLog('### Not eligible :-( ###')
@@ -173,9 +185,21 @@ puppeteer
               .replace(/[\r\n]/g, '\n')
           }, currentStepSel)}`
         )
-        await page.click(showMapSel)
-        await page.waitForSelector('#map.js-show')
-        await page.screenshot({ path: 'map.png' })
+
+        await page.waitForSelector('#map')
+        await page.evaluate(() => {
+          document.querySelector('#map').contentWindow.reload()
+        })
+
+        // await page.click(showMapSel)
+        await page.waitForFunction(
+          mapReceived => {
+            return mapReceived === true
+          },
+          {},
+          mapReceived
+        )
+        await page.screenshot({ path: path.join(runOutputDir, 'map.png') })
         break
       default:
         returnCode = UNKNOWN_ERR
@@ -186,6 +210,9 @@ puppeteer
       path: path.join(runOutputDir, 'result.png'),
       fullPage: true
     })
+
+    await page.tracing.stop()
+    await page.close()
     browser.close()
     process.exit(returnCode)
   })
